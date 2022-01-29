@@ -1,0 +1,1 @@
+/// <reference types="near-certified-developer-project/assembly/as_types" />

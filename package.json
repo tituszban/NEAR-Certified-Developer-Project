@@ -1,0 +1,22 @@
+{
+    "name": "donation-dao",
+    "version": "0.0.1",
+    "description": "NEAR Certified Developer project",
+    "scripts": {
+        "dev": "watch -d -n 1 'clear && yarn test:unit'",
+        "asp": "asp --verbose --nologo",
+        "test:unit": "yarn asp -f unit.spec",
+        "build": "asb --target debug",
+        "build:release": "asb",
+        "test": "yarn build:release && yarn test:unit",
+        "clean": "rm -rf ./build && rm -rf ./neardev && rm -rf ./target",
+        "test:debug": "node --inspect-brk ./node_modules/.bin/asp"
+    },
+    "keywords": [],
+    "author": "tituszban.near",
+    "license": "ISC",
+    "devDependencies": {
+        "@types/jest": "^27.4.0",
+        "near-sdk-as": "^3.0.0"
+    }
+}
