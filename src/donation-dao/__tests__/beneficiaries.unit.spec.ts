@@ -1,7 +1,7 @@
 import { VMContext, u128 } from "near-sdk-as";
 import { ONE_NEAR } from "../../utils";
 
-import { Beneficiaries } from "../assembly/models";
+import { Member, Beneficiaries } from "../assembly/models";
 
 const owner = "tb";
 
@@ -11,7 +11,7 @@ beforeEach(() => {
     beneficiaries = new Beneficiaries(owner);
 })
 
-describe("get_donation_shares", () => {
+describe("Beneficiaries.get_donation_shares", () => {
 
     it("only owner created gets all shares", () => {
         let donation = u128.mul(ONE_NEAR, u128.from(1));
@@ -24,3 +24,4 @@ describe("get_donation_shares", () => {
         expect(ownerShare.share).toBe(donation);
     })
 })
+
