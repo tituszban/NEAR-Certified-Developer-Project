@@ -116,8 +116,8 @@ export class Proposals {
     return this.proposals.to_array().map<Proposal>(p => p.to_proposal());
   }
 
-  finalise_proposals(currentTime: u64): Array<Proposal> {
-    const completedProposals: Array<Proposal> = [];
+  finalise_proposals(currentTime: u64): Array<ProposalResult> {
+    const completedProposals: Array<ProposalResult> = [];
     for (let i = 0; i < this.proposals.length; i++) {
       const proposal = this.proposals[i].to_proposal();
       const proposalPassed = proposal.did_pass(this.beneficiaries.get_members());
@@ -127,7 +127,7 @@ export class Proposals {
         }
         proposal.isActive = false;
         this.proposals.replace(i, proposal.to_serialiseable())
-        completedProposals.push(proposal);
+        completedProposals.push(new ProposalResult(proposal, proposalPassed));
       }
     }
     return completedProposals;
@@ -154,8 +154,9 @@ export class Proposals {
     return proposal;
   }
 
-  vote_on_proposal(currentTime: u64, account: AccountId, proposalId: u32): u64 {
+  vote_on_proposal(currentTime: u64, account: AccountId, proposalId: u32): u32 {
     assert(this.beneficiaries.is_authoriser(account), "Account must be a known authoriser");
+    assert((proposalId as i32) < this.proposals.length, "Proposal not found");
     const proposal = this.proposals[proposalId].to_proposal();
     assert(currentTime < proposal.deadline, "Proposal deadline has passed");
     assert(proposal.isActive, "Proposal has been finalised");
@@ -406,6 +407,18 @@ export class UpdateBeneficiaryProposal extends Proposal {
     return `${this._describe_base()}: Update beneficiary: ${this.account}; Share of ${this.share}; ${this.isAuthoriser ? "Authoriser" : "Non-authoriser"}`
   }
 }
+
+@nearBindgen
+export class ProposalResult{
+  constructor(
+    public proposal: Proposal,
+    public passed: boolean
+  ){}
+
+  describe(): string {
+    return `Proposal #${this.proposal.proposalId}: ${this.passed ? "PASSED" : "FAILED"}`
+  }
+} 
 
 @nearBindgen
 export class Vector<T> extends PersistentVector<T> {

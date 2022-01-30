@@ -8,14 +8,13 @@ import { Beneficiaries, Member, Proposal, Proposals, Vector } from "./models"
 const CONTRIBUTION_SAFETY_LIMIT: u128 = u128.mul(ONE_NEAR, u128.from(5));   // TODO: why is this needed?
 
 
-
 @nearBindgen
 export class Contract {
     private beneficiaries: Beneficiaries;
     private proposals: Proposals;
 
     constructor(owner: AccountId) {
-        this.beneficiaries = new Beneficiaries(owner);
+        this.beneficiaries = new Beneficiaries(owner);  // TODO: this doesn't work
         this.proposals = new Proposals(this.beneficiaries);
     }
 
@@ -41,19 +40,30 @@ export class Contract {
             : this.proposals.get_all_proposals().map<string>(p => p.describe())
     }
 
+    @mutateState()
+    approve_proposal(proposalId: u32): u32 {
+        return this.proposals.vote_on_proposal(Context.blockTimestamp, Context.sender, proposalId);
+    }
 
+    @mutateState()
+    finalise_proposals(): Array<String> {
+        return this.proposals.finalise_proposals(Context.blockTimestamp).map<string>(r => r.describe());
+    }
 
-    // TODO: DAO proposals:
-    //  - Add beneficiary (share, is_authorizer)
-    //  - Remove beneficiary
-    //  - Change user share
-    //  - Change user is_authorizer
-    // All have time limits.
-    // Voting options:
-    //  - Get proposals
-    //  - Support proposals
-    // Check if proposal has applied on all actions
+    @mutateState()
+    create_add_beneficiary_proposal(deadline: number, account: AccountId, share: number, isAuthoriser: boolean): string {
+        return this.proposals.create_add_beneficiary_proposal(Context.blockTimestamp, deadline as u64, Context.sender, account, share as u64, isAuthoriser).describe();
+    }
 
+    @mutateState()
+    create_remove_beneficiary_proposal(deadline: number, account: AccountId): string {
+        return this.proposals.create_remove_beneficiary_proposal(Context.blockTimestamp, deadline as u64, Context.sender, account).describe();
+    }
+
+    @mutateState()
+    create_update_beneficiary_proposal(deadline: number, account: AccountId, share: number, isAuthoriser: boolean): string {
+        return this.proposals.create_update_beneficiary_proposal(Context.blockTimestamp, deadline as u64, Context.sender, account, share as u64, isAuthoriser).describe();
+    }
 
     private _assert_financial_safety_limits(deposit: u128): void {  // SOURCE: https://github.com/Learn-NEAR/NCD.L1.sample--thanks/blob/main/src/thanks/assembly/index.ts
         assert(u128.le(deposit, CONTRIBUTION_SAFETY_LIMIT), "You are trying to attach too many NEAR Tokens to this call.  There is a safe limit while in beta of 5 NEAR")

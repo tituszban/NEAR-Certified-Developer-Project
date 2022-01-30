@@ -103,7 +103,7 @@ describe("finalise_proposals", () => {
         const finalisedProposals = proposals.finalise_proposals(20);
 
         expect(finalisedProposals).toHaveLength(1);
-        expect(finalisedProposals[0].proposalId).toBe(0);
+        expect(finalisedProposals[0].proposal.proposalId).toBe(0);
 
         const activeProposals = proposals.get_active_proposals();
 
