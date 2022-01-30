@@ -2,7 +2,7 @@ import { logging, Context, u128, ContractPromiseBatch, PersistentSet, Persistent
 
 import { AccountId, ONE_NEAR, asNEAR, XCC_GAS } from "../../utils";
 
-import { Beneficiaries, Member, Vector } from "./models"
+import { Beneficiaries, Member, Proposal, Proposals, Vector } from "./models"
 
 // max 5 NEAR accepted to this contract before it forces a transfer to the owners
 const CONTRIBUTION_SAFETY_LIMIT: u128 = u128.mul(ONE_NEAR, u128.from(5));   // TODO: why is this needed?
@@ -12,9 +12,11 @@ const CONTRIBUTION_SAFETY_LIMIT: u128 = u128.mul(ONE_NEAR, u128.from(5));   // T
 @nearBindgen
 export class Contract {
     private beneficiaries: Beneficiaries;
+    private proposals: Proposals;
 
     constructor(owner: AccountId) {
         this.beneficiaries = new Beneficiaries(owner);
+        this.proposals = new Proposals(this.beneficiaries);
     }
 
     get_beneficiaries(): Array<Member> {
@@ -32,6 +34,14 @@ export class Contract {
             to_owner.transfer(share.share);
         })
     }
+
+    get_proposals(activeOnly: boolean): Array<Proposal> {
+        return activeOnly
+            ? this.proposals.get_active_proposals()
+            : this.proposals.get_all_proposals()
+    }
+
+
 
     // TODO: DAO proposals:
     //  - Add beneficiary (share, is_authorizer)

@@ -9,7 +9,7 @@ let proposal: Proposal
 describe("AddBeneficiaryProposal.apply_proposal", () => {
 
     it("adds member if not already present", () => {
-        proposal = new AddBeneficiaryProposal(0, 0, user1, 10, false);
+        proposal = new AddBeneficiaryProposal(0, 0, owner, user1, 10, false);
 
         const members = proposal.apply_proposal([
             new Member(owner, 100, true)
@@ -25,7 +25,7 @@ describe("AddBeneficiaryProposal.apply_proposal", () => {
     })
 
     it("throws if member already present", () => {
-        proposal = new AddBeneficiaryProposal(0, 0, owner, 100, false);
+        proposal = new AddBeneficiaryProposal(0, 0, owner, owner, 100, false);
 
         expect(() => {
             proposal.apply_proposal([new Member(owner, 100, true)])
@@ -36,7 +36,7 @@ describe("AddBeneficiaryProposal.apply_proposal", () => {
 describe("RemoveBeneficiaryProposal.apply_proposal", () => {
 
     it("removes member if already present", () => {
-        proposal = new RemoveBeneficiaryProposal(0, 0, user1);
+        proposal = new RemoveBeneficiaryProposal(0, 0, owner, user1);
 
         const members = proposal.apply_proposal([
             new Member(owner, 100, true),
@@ -47,7 +47,7 @@ describe("RemoveBeneficiaryProposal.apply_proposal", () => {
     })
 
     it("removing the only member throws", () => {
-        proposal = new RemoveBeneficiaryProposal(0, 0, owner);
+        proposal = new RemoveBeneficiaryProposal(0, 0, owner, owner);
 
         expect(() => {
             proposal.apply_proposal([
@@ -57,7 +57,7 @@ describe("RemoveBeneficiaryProposal.apply_proposal", () => {
     })
 
     it("removing the only authoriser throws", () => {
-        proposal = new RemoveBeneficiaryProposal(0, 0, owner);
+        proposal = new RemoveBeneficiaryProposal(0, 0, owner, owner);
 
         expect(() => {
             proposal.apply_proposal([
@@ -68,7 +68,7 @@ describe("RemoveBeneficiaryProposal.apply_proposal", () => {
     })
 
     it("throws if member not present", () => {
-        proposal = new RemoveBeneficiaryProposal(0, 0, user1);
+        proposal = new RemoveBeneficiaryProposal(0, 0, owner, user1);
 
         expect(() => {
             proposal.apply_proposal([new Member(owner, 100, true)])
@@ -79,7 +79,7 @@ describe("RemoveBeneficiaryProposal.apply_proposal", () => {
 describe("UpdateBeneficiaryProposal.apply_proposal", () => {
 
     it("updates user share", () => {
-        proposal = new UpdateBeneficiaryProposal(0, 0, user1, 100, true);
+        proposal = new UpdateBeneficiaryProposal(0, 0, owner, user1, 100, true);
 
         const members = proposal.apply_proposal([
             new Member(owner, 100, true),
@@ -94,7 +94,7 @@ describe("UpdateBeneficiaryProposal.apply_proposal", () => {
     })
 
     it("throws if member not present", () => {
-        proposal = new UpdateBeneficiaryProposal(0, 0, user1, 100, false);
+        proposal = new UpdateBeneficiaryProposal(0, 0, owner, user1, 100, false);
 
         expect(() => {
             proposal.apply_proposal([new Member(owner, 100, true)])
@@ -102,7 +102,7 @@ describe("UpdateBeneficiaryProposal.apply_proposal", () => {
     })
 
     it("throws if only authoriser becomes not authoriser", () => {
-        proposal = new UpdateBeneficiaryProposal(0, 0, owner, 100, false);
+        proposal = new UpdateBeneficiaryProposal(0, 0, owner, owner, 100, false);
 
         expect(() => {
             proposal.apply_proposal([new Member(owner, 100, true)])
@@ -112,7 +112,7 @@ describe("UpdateBeneficiaryProposal.apply_proposal", () => {
 
 describe("AddBeneficiaryProposal.to_serialiseable", () => {
     it("is reversable", () => {
-        proposal = new AddBeneficiaryProposal(0, 0, owner, 100, true);
+        proposal = new AddBeneficiaryProposal(0, 0, owner, owner, 100, true);
         const aProposal: AddBeneficiaryProposal = proposal as AddBeneficiaryProposal;
 
         const sProposal = proposal.to_serialiseable().to_proposal();
@@ -124,13 +124,13 @@ describe("AddBeneficiaryProposal.to_serialiseable", () => {
         expect(asProposal.account).toBe(aProposal.account);
         expect(asProposal.share).toBe(aProposal.share);
         expect(asProposal.isAuthoriser).toBe(aProposal.isAuthoriser);
-        
+
     })
 })
 
 describe("RemoveBeneficiaryProposal.to_serialiseable", () => {
     it("is reversable", () => {
-        proposal = new RemoveBeneficiaryProposal(0, 0, owner);
+        proposal = new RemoveBeneficiaryProposal(0, 0, owner, owner);
         const aProposal: RemoveBeneficiaryProposal = proposal as RemoveBeneficiaryProposal;
 
         const sProposal = proposal.to_serialiseable().to_proposal();
@@ -139,13 +139,13 @@ describe("RemoveBeneficiaryProposal.to_serialiseable", () => {
         expect(sProposal.votes).toBe(proposal.votes);
         expect(sProposal.isActive).toBe(proposal.isActive);
         const asProposal: RemoveBeneficiaryProposal = sProposal as RemoveBeneficiaryProposal;
-        expect(asProposal.account).toBe(aProposal.account);        
+        expect(asProposal.account).toBe(aProposal.account);
     })
 })
 
 describe("UpdateBeneficiaryProposal.to_serialiseable", () => {
     it("is reversable", () => {
-        proposal = new UpdateBeneficiaryProposal(0, 0, owner, 100, true);
+        proposal = new UpdateBeneficiaryProposal(0, 0, owner, owner, 100, true);
         const aProposal: UpdateBeneficiaryProposal = proposal as UpdateBeneficiaryProposal;
 
         const sProposal = proposal.to_serialiseable().to_proposal();
@@ -157,6 +157,6 @@ describe("UpdateBeneficiaryProposal.to_serialiseable", () => {
         expect(asProposal.account).toBe(aProposal.account);
         expect(asProposal.share).toBe(aProposal.share);
         expect(asProposal.isAuthoriser).toBe(aProposal.isAuthoriser);
-        
+
     })
 })

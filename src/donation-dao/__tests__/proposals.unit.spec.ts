@@ -10,18 +10,25 @@ let proposals: Proposals;
 let beneficiaries: Beneficiaries;
 
 beforeEach(() => {
-    proposals = new Proposals();
     beneficiaries = new Beneficiaries(owner);
-    beneficiaries.apply_proposal(new AddBeneficiaryProposal(0, 0, user1, 10, false))
+    beneficiaries.apply_proposal(new AddBeneficiaryProposal(0, 0, owner, user1, 10, false))
+    proposals = new Proposals(beneficiaries);
 })
 
 describe("create_add_beneficiary_proposal", () => {
     it("has the correct fields", () => {
-        const createdProposal = proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
+        const createdProposal = proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
 
         expect(createdProposal.deadline).toBe(10);
         expect(createdProposal.proposalId).toBe(0);
         expect(createdProposal.votes).toHaveLength(0);
+    })
+
+    it("non authoriser creates multiple proposals throws", () => {
+        proposals.create_add_beneficiary_proposal(0, 10, user1, owner, 1000, true);
+        expect(() => {
+            proposals.create_add_beneficiary_proposal(0, 10, user1, owner, 1000, true);
+        }).toThrow()
     })
 });
 
@@ -33,7 +40,7 @@ describe("get_active_proposals", () => {
     })
 
     it("has proposals after proposal added", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
+        proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
 
         const activeProposals = proposals.get_active_proposals();
 
@@ -49,8 +56,8 @@ describe("get_active_proposals", () => {
 
 describe("vote_on_proposal", () => {
     it("adds vote to proposal", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
-        const voteCount = proposals.vote_on_proposal(1, owner, 0, beneficiaries);
+        proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
+        const voteCount = proposals.vote_on_proposal(1, owner, 0);
 
         expect(voteCount).toBe(1);
 
@@ -60,40 +67,40 @@ describe("vote_on_proposal", () => {
     })
 
     it("duplicate vote throws", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
-        proposals.vote_on_proposal(1, owner, 0, beneficiaries);
+        proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
+        proposals.vote_on_proposal(1, owner, 0);
         expect(() => {
-            proposals.vote_on_proposal(2, owner, 0, beneficiaries);
+            proposals.vote_on_proposal(2, owner, 0);
         }).toThrow()
     })
 
     it("not authoriser vote throws", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
+        proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
         expect(() => {
-            proposals.vote_on_proposal(2, user1, 0, beneficiaries);
+            proposals.vote_on_proposal(2, user1, 0);
         }).toThrow()
     })
 
     it("non-existent user vote throws", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
+        proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
         expect(() => {
-            proposals.vote_on_proposal(2, user2, 0, beneficiaries);
+            proposals.vote_on_proposal(2, user2, 0);
         }).toThrow()
     })
 
     it("voting after deadline throws", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
+        proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
         expect(() => {
-            proposals.vote_on_proposal(20, owner, 0, beneficiaries);
+            proposals.vote_on_proposal(20, owner, 0);
         }).toThrow()
     })
 });
 
 describe("finalise_proposals", () => {
     it("sets expired proposals to inactive", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
+        proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
 
-        const finalisedProposals = proposals.finalise_proposals(20, beneficiaries);
+        const finalisedProposals = proposals.finalise_proposals(20);
 
         expect(finalisedProposals).toHaveLength(1);
         expect(finalisedProposals[0].proposalId).toBe(0);
@@ -107,10 +114,10 @@ describe("finalise_proposals", () => {
     })
 
     it("applies approved proposals", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, user2, 100, false);
-        proposals.vote_on_proposal(5, owner, 0, beneficiaries);
+        proposals.create_add_beneficiary_proposal(0, 10, owner, user2, 100, false);
+        proposals.vote_on_proposal(5, owner, 0);
 
-        const finalisedProposals = proposals.finalise_proposals(20, beneficiaries);
+        const finalisedProposals = proposals.finalise_proposals(20);
 
         expect(finalisedProposals).toHaveLength(1);
 

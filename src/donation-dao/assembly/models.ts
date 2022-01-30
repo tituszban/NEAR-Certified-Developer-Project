@@ -51,6 +51,24 @@ export class Beneficiaries {
       this.members.push(newMembers[i]);
     }
   }
+
+  is_member(account: AccountId): boolean {
+    for (let i = 0; i < this.members.length; i++) {
+      if (this.members[i].account == account) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  is_authoriser(account: AccountId): boolean {
+    for (let i = 0; i < this.members.length; i++) {
+      if (this.members[i].account == account) {
+        return this.members[i].isAuthoriser;
+      }
+    }
+    return false;
+  }
 }
 
 
@@ -77,6 +95,11 @@ export class Member {
 @nearBindgen
 export class Proposals {
   private proposals: Vector<SerialiseableProposal> = new Vector<SerialiseableProposal>(PROPOSALS_VECTOR);
+  private beneficiaries: Beneficiaries;
+
+  constructor(beneficiaries: Beneficiaries){
+    this.beneficiaries = beneficiaries;
+  }
 
   get_active_proposals(): Array<Proposal> {
     const result: Array<Proposal> = [];
@@ -93,14 +116,14 @@ export class Proposals {
     return this.proposals.to_array().map<Proposal>(p => p.to_proposal());
   }
 
-  finalise_proposals(currentTime: u64, beneficiaries: Beneficiaries): Array<Proposal> {
+  finalise_proposals(currentTime: u64): Array<Proposal> {
     const completedProposals: Array<Proposal> = [];
     for (let i = 0; i < this.proposals.length; i++) {
       const proposal = this.proposals[i].to_proposal();
-      const proposalPassed = proposal.did_pass(beneficiaries.get_members());
+      const proposalPassed = proposal.did_pass(this.beneficiaries.get_members());
       if (proposal.deadline < currentTime || proposalPassed) {
         if (proposalPassed) {
-          beneficiaries.apply_proposal(proposal);
+          this.beneficiaries.apply_proposal(proposal);
         }
         proposal.isActive = false;
         this.proposals.replace(i, proposal.to_serialiseable())
@@ -110,36 +133,29 @@ export class Proposals {
     return completedProposals;
   }
 
-  create_add_beneficiary_proposal(currentTime: u64, deadline: u64, account: AccountId, share: u64, isAuthoriser: boolean): Proposal {
+  create_add_beneficiary_proposal(currentTime: u64, deadline: u64, createdBy: AccountId, account: AccountId, share: u64, isAuthoriser: boolean): Proposal {
     assert(currentTime < deadline, "Deadline must be in the future");
-    const proposal = new AddBeneficiaryProposal(this.proposals.length, deadline, account, share, isAuthoriser);
+    const proposal = new AddBeneficiaryProposal(this.proposals.length, deadline, createdBy, account, share, isAuthoriser);
     this._add_proposal(proposal);
     return proposal;
   }
 
-  create_remove_beneficiary_proposal(currentTime: u64, deadline: u64, account: AccountId): Proposal {
+  create_remove_beneficiary_proposal(currentTime: u64, deadline: u64, createdBy: AccountId, account: AccountId): Proposal {
     assert(currentTime < deadline, "Deadline must be in the future");
-    const proposal = new RemoveBeneficiaryProposal(this.proposals.length, deadline, account);
+    const proposal = new RemoveBeneficiaryProposal(this.proposals.length, deadline, createdBy, account);
     this._add_proposal(proposal);
     return proposal;
   }
 
-  create_update_beneficiary_proposal(currentTime: u64, deadline: u64, account: AccountId, share: u64, isAuthoriser: boolean): Proposal {
+  create_update_beneficiary_proposal(currentTime: u64, deadline: u64, createdBy: AccountId, account: AccountId, share: u64, isAuthoriser: boolean): Proposal {
     assert(currentTime < deadline, "Deadline must be in the future");
-    const proposal = new AddBeneficiaryProposal(this.proposals.length, deadline, account, share, isAuthoriser);
+    const proposal = new AddBeneficiaryProposal(this.proposals.length, deadline, createdBy, account, share, isAuthoriser);
     this._add_proposal(proposal);
     return proposal;
   }
 
-  vote_on_proposal(currentTime: u64, account: AccountId, proposalId: u32, beneficiaries: Beneficiaries): u64 {
-    const members = beneficiaries.get_members()
-    let authoriserFound = false;
-    for(let i = 0; i < members.length; i++){
-      if(members[i].account == account && members[i].isAuthoriser){
-        authoriserFound = true;
-      }
-    }
-    assert(authoriserFound, "Account must be a known authoriser");
+  vote_on_proposal(currentTime: u64, account: AccountId, proposalId: u32): u64 {
+    assert(this.beneficiaries.is_authoriser(account), "Account must be a known authoriser");
     const proposal = this.proposals[proposalId].to_proposal();
     assert(currentTime < proposal.deadline, "Proposal deadline has passed");
     assert(proposal.isActive, "Proposal has been finalised");
@@ -151,6 +167,13 @@ export class Proposals {
 
   private _add_proposal(proposal: Proposal): void {
     const activeProposals = this.get_active_proposals()
+
+    if(!this.beneficiaries.is_authoriser(proposal.createdBy)){
+      for(let i = 0; i < activeProposals.length; i++){
+        assert(activeProposals[i].createdBy != proposal.createdBy, "Non authorisers can only have one proposal active at a time")
+      }
+    }
+
     activeProposals.push(proposal);
     if (!this._validate_active_proposals(activeProposals)) {
       throw new Error("Cannot add proposal");
@@ -166,13 +189,14 @@ export class Proposals {
 
 
 @nearBindgen
-class SerialiseableProposal {   // https://stackoverflow.com/questions/70916471/does-persistentvector-not-support-child-classes
+export class SerialiseableProposal {   // https://stackoverflow.com/questions/70916471/does-persistentvector-not-support-child-classes
   constructor(
     public proposalType: string,
     public votes: Array<AccountId>,
     public isActive: boolean,
     public proposalId: u32,
     public deadline: u64,
+    public createdBy: AccountId,
     public account: AccountId,
     public share: u64,
     public isAuthoriser: boolean
@@ -181,11 +205,11 @@ class SerialiseableProposal {   // https://stackoverflow.com/questions/70916471/
   to_proposal(): Proposal {
     let proposal: Proposal;
     if (this.proposalType == "add") {
-      proposal = new AddBeneficiaryProposal(this.proposalId, this.deadline, this.account, this.share, this.isAuthoriser);
+      proposal = new AddBeneficiaryProposal(this.proposalId, this.deadline, this.createdBy, this.account, this.share, this.isAuthoriser);
     } else if (this.proposalType == "remove") {
-      proposal = new RemoveBeneficiaryProposal(this.proposalId, this.deadline, this.account);
+      proposal = new RemoveBeneficiaryProposal(this.proposalId, this.deadline, this.createdBy, this.account);
     } else if (this.proposalType == "update") {
-      proposal = new UpdateBeneficiaryProposal(this.proposalId, this.deadline, this.account, this.share, this.isAuthoriser);
+      proposal = new UpdateBeneficiaryProposal(this.proposalId, this.deadline, this.createdBy, this.account, this.share, this.isAuthoriser);
     } else {
       throw new Error(`Unknown type ${this.proposalType}`);
     }
@@ -201,7 +225,8 @@ export abstract class Proposal {
   public isActive: boolean;
   constructor(
     public proposalId: u32,
-    public deadline: u64
+    public deadline: u64,
+    public createdBy: AccountId
   ) {
     this.votes = [];
     this.isActive = true;
@@ -223,7 +248,7 @@ export abstract class Proposal {
   }
 
   vote(account: AccountId): u32 {
-    for(let i = 0; i < this.votes.length; i++){
+    for (let i = 0; i < this.votes.length; i++) {
       assert(this.votes[i] != account, "This account has already voted")
     }
     this.votes.push(account);
@@ -237,11 +262,12 @@ export class AddBeneficiaryProposal extends Proposal {
   constructor(
     proposalId: u32,
     deadline: u64,
+    createdBy: AccountId,
     public account: AccountId,
     public share: u64,
     public isAuthoriser: boolean
   ) {
-    super(proposalId, deadline);
+    super(proposalId, deadline, createdBy);
   }
 
   apply_proposal(members: Array<Member>): Array<Member> {
@@ -265,6 +291,7 @@ export class AddBeneficiaryProposal extends Proposal {
       this.isActive,
       this.proposalId,
       this.deadline,
+      this.createdBy,
       this.account,
       this.share,
       this.isAuthoriser
@@ -277,9 +304,10 @@ export class RemoveBeneficiaryProposal extends Proposal {
   constructor(
     proposalId: u32,
     deadline: u64,
+    createdBy: AccountId,
     public account: AccountId,
   ) {
-    super(proposalId, deadline);
+    super(proposalId, deadline, createdBy);
   }
 
   apply_proposal(members: Array<Member>): Array<Member> {
@@ -303,6 +331,7 @@ export class RemoveBeneficiaryProposal extends Proposal {
       this.isActive,
       this.proposalId,
       this.deadline,
+      this.createdBy,
       this.account,
       0, false
     )
@@ -315,11 +344,12 @@ export class UpdateBeneficiaryProposal extends Proposal {
   constructor(
     proposalId: u32,
     deadline: u64,
+    createdBy: AccountId,
     public account: AccountId,
     public share: u64,
     public isAuthoriser: boolean
   ) {
-    super(proposalId, deadline)
+    super(proposalId, deadline, createdBy)
   }
 
   apply_proposal(members: Array<Member>): Array<Member> {
@@ -351,6 +381,7 @@ export class UpdateBeneficiaryProposal extends Proposal {
       this.isActive,
       this.proposalId,
       this.deadline,
+      this.createdBy,
       this.account,
       this.share,
       this.isAuthoriser
