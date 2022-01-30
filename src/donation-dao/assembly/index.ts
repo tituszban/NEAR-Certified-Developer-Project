@@ -35,10 +35,10 @@ export class Contract {
         })
     }
 
-    get_proposals(activeOnly: boolean): Array<Proposal> {
+    get_proposals(activeOnly: boolean): Array<string> {
         return activeOnly
-            ? this.proposals.get_active_proposals()
-            : this.proposals.get_all_proposals()
+            ? this.proposals.get_active_proposals().map<string>(p => p.describe())
+            : this.proposals.get_all_proposals().map<string>(p => p.describe())
     }
 
 

@@ -97,7 +97,7 @@ export class Proposals {
   private proposals: Vector<SerialiseableProposal> = new Vector<SerialiseableProposal>(PROPOSALS_VECTOR);
   private beneficiaries: Beneficiaries;
 
-  constructor(beneficiaries: Beneficiaries){
+  constructor(beneficiaries: Beneficiaries) {
     this.beneficiaries = beneficiaries;
   }
 
@@ -168,8 +168,8 @@ export class Proposals {
   private _add_proposal(proposal: Proposal): void {
     const activeProposals = this.get_active_proposals()
 
-    if(!this.beneficiaries.is_authoriser(proposal.createdBy)){
-      for(let i = 0; i < activeProposals.length; i++){
+    if (!this.beneficiaries.is_authoriser(proposal.createdBy)) {
+      for (let i = 0; i < activeProposals.length; i++) {
         assert(activeProposals[i].createdBy != proposal.createdBy, "Non authorisers can only have one proposal active at a time")
       }
     }
@@ -236,6 +236,8 @@ export abstract class Proposal {
 
   abstract to_serialiseable(): SerialiseableProposal;
 
+  abstract describe(): string;
+
   protected verify_members_integiry(members: Array<Member>): void {
     assert(members.length > 0, "There always must be members");
     assert(members.reduce((c, member) => c + (member.isAuthoriser ? 1 : 0), 0) > 0, "There always must be at least one authoriser")
@@ -253,6 +255,10 @@ export abstract class Proposal {
     }
     this.votes.push(account);
     return this.votes.length;
+  }
+
+  protected _describe_base(): string {
+    return `Proposal #${this.proposalId} (Created by ${this.createdBy}, Deadline: ${this.deadline}; ${this.isActive ? "Active" : "Inactive"})`
   }
 }
 
@@ -297,6 +303,10 @@ export class AddBeneficiaryProposal extends Proposal {
       this.isAuthoriser
     )
   }
+
+  describe(): string {
+    return `${this._describe_base()}: Add new beneficiary: ${this.account} with a share of ${this.share} as ${this.isAuthoriser ? "Authoriser" : "Non-authoriser"}`
+  }
 }
 
 @nearBindgen
@@ -335,6 +345,10 @@ export class RemoveBeneficiaryProposal extends Proposal {
       this.account,
       0, false
     )
+  }
+
+  describe(): string {
+    return `${this._describe_base()}: Remove beneficiary: ${this.account}`
   }
 }
 
@@ -386,6 +400,10 @@ export class UpdateBeneficiaryProposal extends Proposal {
       this.share,
       this.isAuthoriser
     )
+  }
+
+  describe(): string {
+    return `${this._describe_base()}: Update beneficiary: ${this.account}; Share of ${this.share}; ${this.isAuthoriser ? "Authoriser" : "Non-authoriser"}`
   }
 }
 
