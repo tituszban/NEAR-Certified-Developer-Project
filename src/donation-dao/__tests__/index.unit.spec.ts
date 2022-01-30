@@ -22,6 +22,6 @@ describe("Contract", () => {
         expect(beneficiaries).toHaveLength(1);
         expect(beneficiaries[0].account).toBe(owner);
         expect(beneficiaries[0].share).toBe(100);
-        expect(beneficiaries[0].is_authoriser).toBe(true);
+        expect(beneficiaries[0].isAuthoriser).toBe(true);
     });
 })

@@ -21,7 +21,6 @@ export class Contract {
         return this.beneficiaries.get_members();
     }
 
-    @mutateState()
     donate(): void {
         const donation = Context.attachedDeposit;
         this._assert_financial_safety_limits(donation)
