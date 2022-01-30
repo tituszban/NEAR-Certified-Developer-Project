@@ -3,7 +3,9 @@ import { AccountId } from "../../utils";
 
 
 const BENEFICIARIES_VECTOR: string = "beneficiaries";
+const PROPOSALS_VECTOR: string = "proposals";
 
+@nearBindgen
 export class Beneficiaries {
   private members: Vector<Member> = new Vector<Member>(BENEFICIARIES_VECTOR);
 
@@ -45,7 +47,7 @@ export class Beneficiaries {
     const newMembers = proposal.apply_proposal(this.members.to_array());
     // TODO: more intelligent/efficient merge
     this.members.clear();
-    for(let i = 0; i < newMembers.length; i++){
+    for (let i = 0; i < newMembers.length; i++) {
       this.members.push(newMembers[i]);
     }
   }
@@ -73,15 +75,141 @@ export class Member {
 }
 
 @nearBindgen
-export abstract class Proposal {
-  public votes: u64;
+export class Proposals {
+  private proposals: Vector<SerialiseableProposal> = new Vector<SerialiseableProposal>(PROPOSALS_VECTOR);
+
+  get_active_proposals(): Array<Proposal> {
+    const result: Array<Proposal> = [];
+
+    for (let i = 0; i < this.proposals.length; i++) {
+      if (this.proposals[i].isActive) {
+        result.push(this.proposals[i].to_proposal());
+      }
+    }
+    return result;
+  }
+
+  get_all_proposals(): Array<Proposal> {
+    return this.proposals.to_array().map<Proposal>(p => p.to_proposal());
+  }
+
+  finalise_proposals(currentTime: u64, beneficiaries: Beneficiaries): Array<Proposal> {
+    const completedProposals: Array<Proposal> = [];
+    for (let i = 0; i < this.proposals.length; i++) {
+      const proposal = this.proposals[i].to_proposal();
+      const proposalPassed = proposal.did_pass(beneficiaries.get_members());
+      if (proposal.deadline < currentTime || proposalPassed) {
+        if (proposalPassed) {
+          beneficiaries.apply_proposal(proposal);
+        }
+        proposal.isActive = false;
+        this.proposals.replace(i, proposal.to_serialiseable())
+        completedProposals.push(proposal);
+      }
+    }
+    return completedProposals;
+  }
+
+  create_add_beneficiary_proposal(currentTime: u64, deadline: u64, account: AccountId, share: u64, isAuthoriser: boolean): Proposal {
+    assert(currentTime < deadline, "Deadline must be in the future");
+    const proposal = new AddBeneficiaryProposal(this.proposals.length, deadline, account, share, isAuthoriser);
+    this._add_proposal(proposal);
+    return proposal;
+  }
+
+  create_remove_beneficiary_proposal(currentTime: u64, deadline: u64, account: AccountId): Proposal {
+    assert(currentTime < deadline, "Deadline must be in the future");
+    const proposal = new RemoveBeneficiaryProposal(this.proposals.length, deadline, account);
+    this._add_proposal(proposal);
+    return proposal;
+  }
+
+  create_update_beneficiary_proposal(currentTime: u64, deadline: u64, account: AccountId, share: u64, isAuthoriser: boolean): Proposal {
+    assert(currentTime < deadline, "Deadline must be in the future");
+    const proposal = new AddBeneficiaryProposal(this.proposals.length, deadline, account, share, isAuthoriser);
+    this._add_proposal(proposal);
+    return proposal;
+  }
+
+  vote_on_proposal(currentTime: u64, account: AccountId, proposalId: u32, beneficiaries: Beneficiaries): u64 {
+    const members = beneficiaries.get_members()
+    let authoriserFound = false;
+    for(let i = 0; i < members.length; i++){
+      if(members[i].account == account && members[i].isAuthoriser){
+        authoriserFound = true;
+      }
+    }
+    assert(authoriserFound, "Account must be a known authoriser");
+    const proposal = this.proposals[proposalId].to_proposal();
+    assert(currentTime < proposal.deadline, "Proposal deadline has passed");
+    assert(proposal.isActive, "Proposal has been finalised");
+
+    const voteCount = proposal.vote(account);
+    this.proposals.replace(proposalId, proposal.to_serialiseable());
+    return voteCount;
+  }
+
+  private _add_proposal(proposal: Proposal): void {
+    const activeProposals = this.get_active_proposals()
+    activeProposals.push(proposal);
+    if (!this._validate_active_proposals(activeProposals)) {
+      throw new Error("Cannot add proposal");
+    }
+
+    this.proposals.push(proposal.to_serialiseable());
+  }
+
+  private _validate_active_proposals(active_proposals: Array<Proposal>): boolean {
+    return true;  // TODO: add logic
+  }
+}
+
+
+@nearBindgen
+class SerialiseableProposal {   // https://stackoverflow.com/questions/70916471/does-persistentvector-not-support-child-classes
   constructor(
-    public readonly deadline: u64
+    public proposalType: string,
+    public votes: Array<AccountId>,
+    public isActive: boolean,
+    public proposalId: u32,
+    public deadline: u64,
+    public account: AccountId,
+    public share: u64,
+    public isAuthoriser: boolean
+  ) { }
+
+  to_proposal(): Proposal {
+    let proposal: Proposal;
+    if (this.proposalType == "add") {
+      proposal = new AddBeneficiaryProposal(this.proposalId, this.deadline, this.account, this.share, this.isAuthoriser);
+    } else if (this.proposalType == "remove") {
+      proposal = new RemoveBeneficiaryProposal(this.proposalId, this.deadline, this.account);
+    } else if (this.proposalType == "update") {
+      proposal = new UpdateBeneficiaryProposal(this.proposalId, this.deadline, this.account, this.share, this.isAuthoriser);
+    } else {
+      throw new Error(`Unknown type ${this.proposalType}`);
+    }
+    proposal.votes = this.votes;
+    proposal.isActive = this.isActive;
+    return proposal;
+  }
+}
+
+@nearBindgen
+export abstract class Proposal {
+  public votes: Array<AccountId>;
+  public isActive: boolean;
+  constructor(
+    public proposalId: u32,
+    public deadline: u64
   ) {
-    this.votes = 0;
+    this.votes = [];
+    this.isActive = true;
   }
 
   abstract apply_proposal(members: Array<Member>): Array<Member>;
+
+  abstract to_serialiseable(): SerialiseableProposal;
 
   protected verify_members_integiry(members: Array<Member>): void {
     assert(members.length > 0, "There always must be members");
@@ -89,18 +217,31 @@ export abstract class Proposal {
     let initialShares: u64 = 0;
     assert(members.reduce((s, member) => s + member.share, initialShares) > 0, "Total shares must be greater than 0");
   }
+
+  did_pass(members: Array<Member>): boolean {
+    return this.votes.length > (members.filter(m => m.isAuthoriser).length / 2);
+  }
+
+  vote(account: AccountId): u32 {
+    for(let i = 0; i < this.votes.length; i++){
+      assert(this.votes[i] != account, "This account has already voted")
+    }
+    this.votes.push(account);
+    return this.votes.length;
+  }
 }
 
 @nearBindgen
 export class AddBeneficiaryProposal extends Proposal {
 
   constructor(
+    proposalId: u32,
     deadline: u64,
-    public readonly account: AccountId,
-    public readonly share: u64,
-    public readonly is_authorizer: boolean
+    public account: AccountId,
+    public share: u64,
+    public isAuthoriser: boolean
   ) {
-    super(deadline);
+    super(proposalId, deadline);
   }
 
   apply_proposal(members: Array<Member>): Array<Member> {
@@ -110,21 +251,35 @@ export class AddBeneficiaryProposal extends Proposal {
       result.push(members[i])
     }
 
-    result.push(new Member(this.account, this.share, this.is_authorizer));
+    result.push(new Member(this.account, this.share, this.isAuthoriser));
 
     this.verify_members_integiry(result);
 
     return result;
+  }
+
+  to_serialiseable(): SerialiseableProposal {
+    return new SerialiseableProposal(
+      "add",
+      this.votes,
+      this.isActive,
+      this.proposalId,
+      this.deadline,
+      this.account,
+      this.share,
+      this.isAuthoriser
+    )
   }
 }
 
 @nearBindgen
 export class RemoveBeneficiaryProposal extends Proposal {
   constructor(
+    proposalId: u32,
     deadline: u64,
-    public readonly account: AccountId,
+    public account: AccountId,
   ) {
-    super(deadline);
+    super(proposalId, deadline);
   }
 
   apply_proposal(members: Array<Member>): Array<Member> {
@@ -140,18 +295,31 @@ export class RemoveBeneficiaryProposal extends Proposal {
 
     return result;
   }
+
+  to_serialiseable(): SerialiseableProposal {
+    return new SerialiseableProposal(
+      "remove",
+      this.votes,
+      this.isActive,
+      this.proposalId,
+      this.deadline,
+      this.account,
+      0, false
+    )
+  }
 }
 
 @nearBindgen
 export class UpdateBeneficiaryProposal extends Proposal {
-  
+
   constructor(
+    proposalId: u32,
     deadline: u64,
-    public readonly account: AccountId,
-    public readonly share: u64,
-    public readonly isAuthoriser: boolean
+    public account: AccountId,
+    public share: u64,
+    public isAuthoriser: boolean
   ) {
-    super(deadline)
+    super(proposalId, deadline)
   }
 
   apply_proposal(members: Array<Member>): Array<Member> {
@@ -174,6 +342,19 @@ export class UpdateBeneficiaryProposal extends Proposal {
     this.verify_members_integiry(result);
 
     return result;
+  }
+
+  to_serialiseable(): SerialiseableProposal {
+    return new SerialiseableProposal(
+      "update",
+      this.votes,
+      this.isActive,
+      this.proposalId,
+      this.deadline,
+      this.account,
+      this.share,
+      this.isAuthoriser
+    )
   }
 }
 

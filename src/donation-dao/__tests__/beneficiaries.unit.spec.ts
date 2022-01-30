@@ -27,7 +27,7 @@ describe("Beneficiaries.get_donation_shares", () => {
     })
 
     it("multiple owners with same shares get equal amount", () => {
-        beneficiaries.apply_proposal(new AddBeneficiaryProposal(0, user1, 100, false));
+        beneficiaries.apply_proposal(new AddBeneficiaryProposal(0, 0, user1, 100, false));
 
         let donation = u128.mul(ONE_NEAR, u128.from(1));
         let expectedDonation = u128.div(ONE_NEAR, u128.from(2));
@@ -39,8 +39,8 @@ describe("Beneficiaries.get_donation_shares", () => {
     })
 
     it("multiple owners with different shares get different amount", () => {
-        beneficiaries.apply_proposal(new UpdateBeneficiaryProposal(0, owner, 75, true));
-        beneficiaries.apply_proposal(new AddBeneficiaryProposal(0, user1, 25, false));
+        beneficiaries.apply_proposal(new UpdateBeneficiaryProposal(0, 0, owner, 75, true));
+        beneficiaries.apply_proposal(new AddBeneficiaryProposal(0, 0, user1, 25, false));
 
         let donation = ONE_NEAR;
         let expectedDonation1 = u128.div(u128.mul(ONE_NEAR, u128.from(3)), u128.from(4));
@@ -54,8 +54,8 @@ describe("Beneficiaries.get_donation_shares", () => {
     })
 
     it("uneven division first member gets more", () => {
-        beneficiaries.apply_proposal(new AddBeneficiaryProposal(0, user1, 100, false));
-        beneficiaries.apply_proposal(new AddBeneficiaryProposal(0, user2, 100, false));
+        beneficiaries.apply_proposal(new AddBeneficiaryProposal(0, 0, user1, 100, false));
+        beneficiaries.apply_proposal(new AddBeneficiaryProposal(0, 0, user2, 100, false));
 
         let donation = ONE_NEAR;
         let expectedDonation = u128.div(ONE_NEAR, u128.from(3));

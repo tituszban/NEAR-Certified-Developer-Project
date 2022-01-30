@@ -1,112 +1,124 @@
-import { VMContext, u128 } from "near-sdk-as";
-import { ONE_NEAR } from "../../utils";
+import { u128 } from "near-sdk-as";
 
-import { AddBeneficiaryProposal, RemoveBeneficiaryProposal, UpdateBeneficiaryProposal, Member, Vector, Proposal } from "../assembly/models";
+import { AddBeneficiaryProposal, Beneficiaries, Proposal, Proposals } from "../assembly/models";
 
 const owner = "tb";
 const user1 = "user1";
-let proposal: Proposal
+const user2 = "user2";
 
-describe("AddBeneficiaryProposal.apply_proposal", () => {
+let proposals: Proposals;
+let beneficiaries: Beneficiaries;
 
-    it("adds member if not already present", () => {
-        proposal = new AddBeneficiaryProposal(0, user1, 10, false);
-
-        const members = proposal.apply_proposal([
-            new Member(owner, 100, true)
-        ]);
-
-        expect(members).toHaveLength(2);
-
-        const newMember = members[1];
-
-        expect(newMember.account).toBe(user1);
-        expect(newMember.share).toBe(10);
-        expect(newMember.isAuthoriser).toBe(false);
-    })
-
-    it("throws if member already present", () => {
-        proposal = new AddBeneficiaryProposal(0, owner, 100, false);
-
-        expect(() => {
-            proposal.apply_proposal([new Member(owner, 100, true)])
-        }).toThrow();
-    })
+beforeEach(() => {
+    proposals = new Proposals();
+    beneficiaries = new Beneficiaries(owner);
+    beneficiaries.apply_proposal(new AddBeneficiaryProposal(0, 0, user1, 10, false))
 })
 
-describe("RemoveBeneficiaryProposal.apply_proposal", () => {
+describe("create_add_beneficiary_proposal", () => {
+    it("has the correct fields", () => {
+        const createdProposal = proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
 
-    it("removes member if already present", () => {
-        proposal = new RemoveBeneficiaryProposal(0, user1);
+        expect(createdProposal.deadline).toBe(10);
+        expect(createdProposal.proposalId).toBe(0);
+        expect(createdProposal.votes).toHaveLength(0);
+    })
+});
 
-        const members = proposal.apply_proposal([
-            new Member(owner, 100, true),
-            new Member(user1, 10, false)
-        ]);
+describe("get_active_proposals", () => {
+    it("is empty after init", () => {
+        const activeProposals = proposals.get_active_proposals();
 
-        expect(members).toHaveLength(1);
+        expect(activeProposals).toHaveLength(0);
     })
 
-    it("removing the only member throws", () => {
-        proposal = new RemoveBeneficiaryProposal(0, owner);
+    it("has proposals after proposal added", () => {
+        proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
 
+        const activeProposals = proposals.get_active_proposals();
+
+        expect(activeProposals).toHaveLength(1);
+
+        const activeProposal = activeProposals[0];
+
+        expect(activeProposal.deadline).toBe(10);
+        expect(activeProposal.proposalId).toBe(0);
+        expect(activeProposal.votes).toHaveLength(0);
+    })
+});
+
+describe("vote_on_proposal", () => {
+    it("adds vote to proposal", () => {
+        proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
+        const voteCount = proposals.vote_on_proposal(1, owner, 0, beneficiaries);
+
+        expect(voteCount).toBe(1);
+
+        const proposal = proposals.get_active_proposals()[0];
+
+        expect(proposal.votes).toHaveLength(1);
+    })
+
+    it("duplicate vote throws", () => {
+        proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
+        proposals.vote_on_proposal(1, owner, 0, beneficiaries);
         expect(() => {
-            proposal.apply_proposal([
-                new Member(owner, 100, true),
-            ]);
-        }).toThrow();
+            proposals.vote_on_proposal(2, owner, 0, beneficiaries);
+        }).toThrow()
     })
 
-    it("removing the only authoriser throws", () => {
-        proposal = new RemoveBeneficiaryProposal(0, owner);
-
+    it("not authoriser vote throws", () => {
+        proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
         expect(() => {
-            proposal.apply_proposal([
-                new Member(owner, 100, true),
-                new Member(user1, 10, false)
-            ]);
-        }).toThrow();
+            proposals.vote_on_proposal(2, user1, 0, beneficiaries);
+        }).toThrow()
     })
 
-    it("throws if member not present", () => {
-        proposal = new RemoveBeneficiaryProposal(0, user1);
-
+    it("non-existent user vote throws", () => {
+        proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
         expect(() => {
-            proposal.apply_proposal([new Member(owner, 100, true)])
-        }).toThrow();
+            proposals.vote_on_proposal(2, user2, 0, beneficiaries);
+        }).toThrow()
     })
-})
 
-describe("UpdateBeneficiaryProposal.apply_proposal", () => {
+    it("voting after deadline throws", () => {
+        proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
+        expect(() => {
+            proposals.vote_on_proposal(20, owner, 0, beneficiaries);
+        }).toThrow()
+    })
+});
 
-    it("updates user share", () => {
-        proposal = new UpdateBeneficiaryProposal(0, user1, 100, true);
+describe("finalise_proposals", () => {
+    it("sets expired proposals to inactive", () => {
+        proposals.create_add_beneficiary_proposal(0, 10, owner, 1000, true);
 
-        const members = proposal.apply_proposal([
-            new Member(owner, 100, true),
-            new Member(user1, 10, false)
-        ]);
+        const finalisedProposals = proposals.finalise_proposals(20, beneficiaries);
 
+        expect(finalisedProposals).toHaveLength(1);
+        expect(finalisedProposals[0].proposalId).toBe(0);
+
+        const activeProposals = proposals.get_active_proposals();
+
+        expect(activeProposals).toHaveLength(0);
+
+        const members = beneficiaries.get_members()
         expect(members).toHaveLength(2);
-
-        const updatedMember = members[1];
-        expect(updatedMember.share).toBe(100);
-        expect(updatedMember.isAuthoriser).toBe(true);
     })
 
-    it("throws if member not present", () => {
-        proposal = new UpdateBeneficiaryProposal(0, user1, 100, false);
+    it("applies approved proposals", () => {
+        proposals.create_add_beneficiary_proposal(0, 10, user2, 100, false);
+        proposals.vote_on_proposal(5, owner, 0, beneficiaries);
 
-        expect(() => {
-            proposal.apply_proposal([new Member(owner, 100, true)])
-        }).toThrow();
-    })
+        const finalisedProposals = proposals.finalise_proposals(20, beneficiaries);
 
-    it("throws if only authoriser becomes not authoriser", () => {
-        proposal = new UpdateBeneficiaryProposal(0, owner, 100, false);
+        expect(finalisedProposals).toHaveLength(1);
 
-        expect(() => {
-            proposal.apply_proposal([new Member(owner, 100, true)])
-        }).toThrow();
+        const activeProposals = proposals.get_active_proposals();
+
+        expect(activeProposals).toHaveLength(0);
+
+        const members = beneficiaries.get_members()
+        expect(members).toHaveLength(3);
     })
 })

@@ -42,7 +42,6 @@ export class Contract {
     // Voting options:
     //  - Get proposals
     //  - Support proposals
-    //  - Reject proposal
     // Check if proposal has applied on all actions
 
 
