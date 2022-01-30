@@ -3,9 +3,9 @@ import os
 import shutil
 import re
 import json
+from contextlib import contextmanager
 
 OWNER = "tituszban.testnet"
-
 
 def call(arguments):
     result = subprocess.run(arguments, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -29,20 +29,32 @@ def delete_contract(contract_id):
     print("===== Deleting contract =====")
     call(["near", "delete", contract_id, OWNER])
 
-def call_contract(contract_id, function, data, account_id=OWNER):
-    print(f"===== Calling {function} =====")
-    return call(["near", "call", contract_id, function, json.dumps(data), "--accountId", account_id])
-
-def create_contract():
+@contextmanager
+def smart_contract():
     build()
 
     contract_id = init_contract()
 
-    call_contract(contract_id, "init", {"owner": OWNER}, account_id=contract_id)
+    try:
+        yield contract_id
+    finally:
+        delete_contract(contract_id)
 
-    call_contract(contract_id, "get_beneficiaries", {})
+def call_contract(contract_id, function, data=None, account_id=OWNER, amount=None):
+    print(f"===== Calling {function} =====")
+    args = ["near", "call", contract_id, function]
+    if data:
+        args.append(json.dumps(data))
+    args.extend(["--accountId", account_id])
+    if amount:
+        args.extend(["--amount", amount])
+    return call(args)
 
-    delete_contract(contract_id)
+def create_contract():
+    with smart_contract() as contract_id:
+        call_contract(contract_id, "init", {"owner": OWNER}, account_id=contract_id)
+
+        call_contract(contract_id, "get_beneficiaries")    
 
 
 def main():

@@ -5,16 +5,30 @@ import { AccountId } from "../../utils";
 const BENEFICIARIES_VECTOR: string = "beneficiaries";
 const PROPOSALS_VECTOR: string = "proposals";
 
+function to_array<T>(v: PersistentVector<T>): Array<T>{
+  const result = new Array<T>();
+    for (let i = 0; i < v.length; i++) {
+      result.push(v[i]);
+    }
+    return result;
+}
+
+function clear<T>(v: PersistentVector<T>): void{
+  while (v.length > 0) {
+    v.pop();
+  }
+}
+
 @nearBindgen
 export class Beneficiaries {
-  private members: Vector<Member> = new Vector<Member>(BENEFICIARIES_VECTOR);
+  private members: PersistentVector<Member> = new PersistentVector<Member>(BENEFICIARIES_VECTOR);
 
   constructor(initialUser: AccountId) {
     this.members.pushBack(new Member(initialUser, 100, true));
   }
 
   get_members(): Array<Member> {
-    return this.members.to_array();
+    return to_array(this.members);
   }
 
   get_donation_shares(donation: u128): Array<DonationShare> {
@@ -40,13 +54,13 @@ export class Beneficiaries {
 
   private get_total_shares(): u64 {
     let initial: u64 = 0;
-    return this.members.to_array().reduce((sum, member) => sum + member.share, initial);
+    return to_array(this.members).reduce((sum, member) => sum + member.share, initial);
   }
 
   apply_proposal(proposal: Proposal): void {
-    const newMembers = proposal.apply_proposal(this.members.to_array());
+    const newMembers = proposal.apply_proposal(to_array(this.members));
     // TODO: more intelligent/efficient merge
-    this.members.clear();
+    clear(this.members);
     for (let i = 0; i < newMembers.length; i++) {
       this.members.push(newMembers[i]);
     }
@@ -94,7 +108,7 @@ export class Member {
 
 @nearBindgen
 export class Proposals {
-  private proposals: Vector<SerialiseableProposal> = new Vector<SerialiseableProposal>(PROPOSALS_VECTOR);
+  private proposals: PersistentVector<SerialiseableProposal> = new PersistentVector<SerialiseableProposal>(PROPOSALS_VECTOR);
   private beneficiaries: Beneficiaries;
 
   constructor(beneficiaries: Beneficiaries) {
@@ -113,7 +127,7 @@ export class Proposals {
   }
 
   get_all_proposals(): Array<Proposal> {
-    return this.proposals.to_array().map<Proposal>(p => p.to_proposal());
+    return to_array(this.proposals).map<Proposal>(p => p.to_proposal());
   }
 
   finalise_proposals(currentTime: u64): Array<ProposalResult> {
@@ -417,23 +431,5 @@ export class ProposalResult{
 
   describe(): string {
     return `Proposal #${this.proposal.proposalId}: ${this.passed ? "PASSED" : "FAILED"}`
-  }
-} 
-
-@nearBindgen
-export class Vector<T> extends PersistentVector<T> {
-
-  to_array(): Array<T> {
-    const result = new Array<T>();
-    for (let i = 0; i < this.length; i++) {
-      result.push(this[i]);
-    }
-    return result;
-  }
-
-  clear(): void {
-    while (this.length > 0) {
-      this.pop();
-    }
   }
 }

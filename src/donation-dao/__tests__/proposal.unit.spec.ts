@@ -1,6 +1,6 @@
 import { VMContext, u128 } from "near-sdk-as";
 
-import { AddBeneficiaryProposal, RemoveBeneficiaryProposal, UpdateBeneficiaryProposal, Member, Vector, Proposal } from "../assembly/models";
+import { AddBeneficiaryProposal, RemoveBeneficiaryProposal, UpdateBeneficiaryProposal, Member, Proposal } from "../assembly/models";
 
 const owner = "tb";
 const user1 = "user1";

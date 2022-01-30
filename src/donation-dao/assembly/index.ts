@@ -2,7 +2,7 @@ import { logging, Context, u128, ContractPromiseBatch, PersistentSet, Persistent
 
 import { AccountId, ONE_NEAR, asNEAR, XCC_GAS } from "../../utils";
 
-import { Beneficiaries, Member, Proposal, Proposals, Vector } from "./models"
+import { Beneficiaries, Member, Proposal, Proposals } from "./models"
 
 // max 5 NEAR accepted to this contract before it forces a transfer to the owners
 const CONTRIBUTION_SAFETY_LIMIT: u128 = u128.mul(ONE_NEAR, u128.from(5));   // TODO: why is this needed?
