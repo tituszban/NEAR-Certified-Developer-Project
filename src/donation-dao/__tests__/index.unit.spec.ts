@@ -3,6 +3,8 @@ import { ONE_NEAR } from "../../utils";
 
 import { Contract } from "../assembly/index";
 
+const NANOSECONDS: u64 = 1_000_000_000;
+
 const contract = "donation.dao";
 const owner = "tb";
 const user1 = "user1";
@@ -50,7 +52,7 @@ describe("full voting cycles", () => {
         VMContext.setBlock_timestamp(0);
         VMContext.setSigner_account_id(owner);
         donDao.create_add_beneficiary_proposal(100, user1, 10, false);
-        VMContext.setBlock_timestamp(120);
+        VMContext.setBlock_timestamp(120 * NANOSECONDS);
         const result = donDao.finalise_proposals()
 
         expect(result).toHaveLength(1);
