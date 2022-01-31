@@ -136,9 +136,6 @@ export class Proposals {
       const proposal = this.proposals[i].to_proposal();
       const proposalPassed = proposal.did_pass(this.beneficiaries.get_members());
       if (proposal.deadline < currentTime || proposalPassed) {
-        if (proposalPassed) {
-          this.beneficiaries.apply_proposal(proposal);
-        }
         proposal.isActive = false;
         this.proposals.replace(i, proposal.to_serialiseable())
         completedProposals.push(new ProposalResult(proposal, proposalPassed));

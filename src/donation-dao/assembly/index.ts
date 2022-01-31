@@ -48,7 +48,15 @@ export class Contract {
 
     @mutateState()
     finalise_proposals(): Array<String> {
-        return this.proposals.finalise_proposals(Context.blockTimestamp).map<string>(r => r.describe());
+        const finalised_proposals = this.proposals.finalise_proposals(Context.blockTimestamp);
+        
+        for(let i = 0; i < finalised_proposals.length; i++){
+            if(finalised_proposals[i].passed){
+                this.beneficiaries.apply_proposal(finalised_proposals[i].proposal);
+            }
+        }
+
+        return finalised_proposals.map<string>(r => r.describe());
     }
 
     @mutateState()

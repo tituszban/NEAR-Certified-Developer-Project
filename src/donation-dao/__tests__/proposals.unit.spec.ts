@@ -108,9 +108,6 @@ describe("finalise_proposals", () => {
         const activeProposals = proposals.get_active_proposals();
 
         expect(activeProposals).toHaveLength(0);
-
-        const members = beneficiaries.get_members()
-        expect(members).toHaveLength(2);
     })
 
     it("applies approved proposals", () => {
@@ -124,8 +121,5 @@ describe("finalise_proposals", () => {
         const activeProposals = proposals.get_active_proposals();
 
         expect(activeProposals).toHaveLength(0);
-
-        const members = beneficiaries.get_members()
-        expect(members).toHaveLength(3);
     })
 })
