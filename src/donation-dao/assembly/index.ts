@@ -7,6 +7,7 @@ import { Beneficiaries, Member, Proposal, Proposals } from "./models"
 // max 5 NEAR accepted to this contract before it forces a transfer to the owners
 const CONTRIBUTION_SAFETY_LIMIT: u128 = u128.mul(ONE_NEAR, u128.from(5));   // TODO: why is this needed?
 
+const NANOSECONDS: u64 = 1_000_000_000;
 
 @nearBindgen
 export class Contract {
@@ -51,18 +52,18 @@ export class Contract {
     }
 
     @mutateState()
-    create_add_beneficiary_proposal(deadline: number, account: AccountId, share: number, isAuthoriser: boolean): string {
-        return this.proposals.create_add_beneficiary_proposal(Context.blockTimestamp, deadline as u64, Context.sender, account, share as u64, isAuthoriser).describe();
+    create_add_beneficiary_proposal(deadline: i32, account: AccountId, share: i32, isAuthoriser: boolean): string {
+        return this.proposals.create_add_beneficiary_proposal(Context.blockTimestamp, (deadline as u64) * NANOSECONDS, Context.sender, account, share as u64, isAuthoriser).describe();
     }
 
     @mutateState()
-    create_remove_beneficiary_proposal(deadline: number, account: AccountId): string {
-        return this.proposals.create_remove_beneficiary_proposal(Context.blockTimestamp, deadline as u64, Context.sender, account).describe();
+    create_remove_beneficiary_proposal(deadline: i32, account: AccountId): string {
+        return this.proposals.create_remove_beneficiary_proposal(Context.blockTimestamp, (deadline as u64) * NANOSECONDS, Context.sender, account).describe();
     }
 
     @mutateState()
-    create_update_beneficiary_proposal(deadline: number, account: AccountId, share: number, isAuthoriser: boolean): string {
-        return this.proposals.create_update_beneficiary_proposal(Context.blockTimestamp, deadline as u64, Context.sender, account, share as u64, isAuthoriser).describe();
+    create_update_beneficiary_proposal(deadline: i32, account: AccountId, share: i32, isAuthoriser: boolean): string {
+        return this.proposals.create_update_beneficiary_proposal(Context.blockTimestamp, (deadline as u64) * NANOSECONDS, Context.sender, account, share as u64, isAuthoriser).describe();
     }
 
     private _assert_financial_safety_limits(deposit: u128): void {  // SOURCE: https://github.com/Learn-NEAR/NCD.L1.sample--thanks/blob/main/src/thanks/assembly/index.ts
