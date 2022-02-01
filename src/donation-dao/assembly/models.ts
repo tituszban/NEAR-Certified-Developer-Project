@@ -209,7 +209,7 @@ export class Proposals {
           currentMembers = result.updatedMembers;
         }
       }
-      let result = new_proposal.apply_proposal(currentMembers);
+      let result = new_proposal.apply_proposal(currentMembers);   // TODO, this should be applied in deadline order...
       if(!result.success){
         return new ProposalValidationResult(false, `${i}/n: ${result.error}`);
       }

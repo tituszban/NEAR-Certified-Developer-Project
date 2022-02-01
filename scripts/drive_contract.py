@@ -74,7 +74,7 @@ def create_contract(owner, user):
         call_contract(contract_id, "donate", account_id=owner, amount=1)
 
         call_contract(contract_id, "create_add_beneficiary_proposal", account_id=owner, data={
-            "deadline": int(time.time()) + 1000,
+            "deadline": int(time.time()) + 600, # 10 minutes
             "account": user,
             "share": 50,
             "isAuthoriser": False
