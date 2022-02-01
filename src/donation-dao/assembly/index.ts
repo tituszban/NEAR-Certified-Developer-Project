@@ -15,7 +15,7 @@ export class Contract {
     private proposals: Proposals;
 
     constructor(owner: AccountId) {
-        this.beneficiaries = new Beneficiaries(owner);  // TODO: this doesn't work
+        this.beneficiaries = new Beneficiaries(owner);
         this.proposals = new Proposals(this.beneficiaries);
     }
 

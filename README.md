@@ -1,6 +1,6 @@
 # Donation-DAO
 
-This is a micro-DAO smart contract developed for the NEAR Certified Developer certification
+This is a micro-DAO smart contract developed for the NEAR Certified Developer project
 
 This DAO does one very simple thing: accept donations in NEAR and distribute it among the beneficiaries.
 
