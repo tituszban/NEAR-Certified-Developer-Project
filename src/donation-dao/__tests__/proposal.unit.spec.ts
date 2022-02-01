@@ -11,25 +11,26 @@ describe("AddBeneficiaryProposal.apply_proposal", () => {
     it("adds member if not already present", () => {
         proposal = new AddBeneficiaryProposal(0, 0, owner, user1, 10, false);
 
-        const members = proposal.apply_proposal([
+        const result = proposal.apply_proposal([
             new Member(owner, 100, true)
         ]);
 
-        expect(members).toHaveLength(2);
+        expect(result.success).toBe(true);
+        expect(result.updatedMembers).toHaveLength(2);
 
-        const newMember = members[1];
+        const newMember = result.updatedMembers[1];
 
         expect(newMember.account).toBe(user1);
         expect(newMember.share).toBe(10);
         expect(newMember.isAuthoriser).toBe(false);
     })
 
-    it("throws if member already present", () => {
+    it("if member already present fails", () => {
         proposal = new AddBeneficiaryProposal(0, 0, owner, owner, 100, false);
 
-        expect(() => {
-            proposal.apply_proposal([new Member(owner, 100, true)])
-        }).toThrow();
+        const result = proposal.apply_proposal([new Member(owner, 100, true)]);
+
+        expect(result.success).toBe(false);
     })
 })
 
@@ -38,41 +39,42 @@ describe("RemoveBeneficiaryProposal.apply_proposal", () => {
     it("removes member if already present", () => {
         proposal = new RemoveBeneficiaryProposal(0, 0, owner, user1);
 
-        const members = proposal.apply_proposal([
+        const result = proposal.apply_proposal([
             new Member(owner, 100, true),
             new Member(user1, 10, false)
         ]);
 
-        expect(members).toHaveLength(1);
+        expect(result.success).toBe(true);
+        expect(result.updatedMembers).toHaveLength(1);
     })
 
-    it("removing the only member throws", () => {
+    it("removing the only member fails", () => {
+        proposal = new RemoveBeneficiaryProposal(0, 0, owner, owner);
+        
+        const result = proposal.apply_proposal([
+            new Member(owner, 100, true),
+        ]);
+
+        expect(result.success).toBe(false);
+    })
+
+    it("removing the only authoriser fails", () => {
         proposal = new RemoveBeneficiaryProposal(0, 0, owner, owner);
 
-        expect(() => {
-            proposal.apply_proposal([
-                new Member(owner, 100, true),
-            ]);
-        }).toThrow();
+        const result = proposal.apply_proposal([
+            new Member(owner, 100, true),
+            new Member(user1, 10, false)
+        ]);
+
+        expect(result.success).toBe(false);
     })
 
-    it("removing the only authoriser throws", () => {
-        proposal = new RemoveBeneficiaryProposal(0, 0, owner, owner);
-
-        expect(() => {
-            proposal.apply_proposal([
-                new Member(owner, 100, true),
-                new Member(user1, 10, false)
-            ]);
-        }).toThrow();
-    })
-
-    it("throws if member not present", () => {
+    it("if member not present fails", () => {
         proposal = new RemoveBeneficiaryProposal(0, 0, owner, user1);
 
-        expect(() => {
-            proposal.apply_proposal([new Member(owner, 100, true)])
-        }).toThrow();
+        const result = proposal.apply_proposal([new Member(owner, 100, true)]);
+
+        expect(result.success).toBe(false);
     })
 })
 
@@ -81,32 +83,33 @@ describe("UpdateBeneficiaryProposal.apply_proposal", () => {
     it("updates user share", () => {
         proposal = new UpdateBeneficiaryProposal(0, 0, owner, user1, 100, true);
 
-        const members = proposal.apply_proposal([
+        const result = proposal.apply_proposal([
             new Member(owner, 100, true),
             new Member(user1, 10, false)
         ]);
+        
+        expect(result.success).toBe(true);
+        expect(result.updatedMembers).toHaveLength(2);
 
-        expect(members).toHaveLength(2);
-
-        const updatedMember = members[1];
+        const updatedMember = result.updatedMembers[1];
         expect(updatedMember.share).toBe(100);
         expect(updatedMember.isAuthoriser).toBe(true);
     })
 
-    it("throws if member not present", () => {
+    it("if member not present fails", () => {
         proposal = new UpdateBeneficiaryProposal(0, 0, owner, user1, 100, false);
 
-        expect(() => {
-            proposal.apply_proposal([new Member(owner, 100, true)])
-        }).toThrow();
+        const result = proposal.apply_proposal([new Member(owner, 100, true)]);
+
+        expect(result.success).toBe(false);
     })
 
-    it("throws if only authoriser becomes not authoriser", () => {
+    it("if only authoriser becomes not authoriser fails", () => {
         proposal = new UpdateBeneficiaryProposal(0, 0, owner, owner, 100, false);
 
-        expect(() => {
-            proposal.apply_proposal([new Member(owner, 100, true)])
-        }).toThrow();
+        const result = proposal.apply_proposal([new Member(owner, 100, true)]);
+
+        expect(result.success).toBe(false);
     })
 })
 

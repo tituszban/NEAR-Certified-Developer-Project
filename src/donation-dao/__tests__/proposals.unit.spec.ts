@@ -17,7 +17,7 @@ beforeEach(() => {
 
 describe("create_add_beneficiary_proposal", () => {
     it("has the correct fields", () => {
-        const createdProposal = proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
+        const createdProposal = proposals.create_add_beneficiary_proposal(0, 10, owner, user2, 1000, true);
 
         expect(createdProposal.deadline).toBe(10);
         expect(createdProposal.proposalId).toBe(0);
@@ -25,9 +25,9 @@ describe("create_add_beneficiary_proposal", () => {
     })
 
     it("non authoriser creates multiple proposals throws", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, user1, owner, 1000, true);
+        proposals.create_add_beneficiary_proposal(0, 10, user1, user2, 1000, true);
         expect(() => {
-            proposals.create_add_beneficiary_proposal(0, 10, user1, owner, 1000, true);
+            proposals.create_add_beneficiary_proposal(0, 10, user1, user2, 1000, true);
         }).toThrow()
     })
 });
@@ -40,7 +40,7 @@ describe("get_active_proposals", () => {
     })
 
     it("has proposals after proposal added", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
+        proposals.create_add_beneficiary_proposal(0, 10, owner, user2, 1000, true);
 
         const activeProposals = proposals.get_active_proposals();
 
@@ -56,7 +56,7 @@ describe("get_active_proposals", () => {
 
 describe("vote_on_proposal", () => {
     it("adds vote to proposal", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
+        proposals.create_add_beneficiary_proposal(0, 10, owner, user2, 1000, true);
         const voteCount = proposals.vote_on_proposal(1, owner, 0);
 
         expect(voteCount).toBe(1);
@@ -67,7 +67,7 @@ describe("vote_on_proposal", () => {
     })
 
     it("duplicate vote throws", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
+        proposals.create_add_beneficiary_proposal(0, 10, owner, user2, 1000, true);
         proposals.vote_on_proposal(1, owner, 0);
         expect(() => {
             proposals.vote_on_proposal(2, owner, 0);
@@ -75,21 +75,21 @@ describe("vote_on_proposal", () => {
     })
 
     it("not authoriser vote throws", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
+        proposals.create_add_beneficiary_proposal(0, 10, owner, user2, 1000, true);
         expect(() => {
             proposals.vote_on_proposal(2, user1, 0);
         }).toThrow()
     })
 
     it("non-existent user vote throws", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
+        proposals.create_add_beneficiary_proposal(0, 10, owner, user2, 1000, true);
         expect(() => {
             proposals.vote_on_proposal(2, user2, 0);
         }).toThrow()
     })
 
     it("voting after deadline throws", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
+        proposals.create_add_beneficiary_proposal(0, 10, owner, user2, 1000, true);
         expect(() => {
             proposals.vote_on_proposal(20, owner, 0);
         }).toThrow()
@@ -98,7 +98,7 @@ describe("vote_on_proposal", () => {
 
 describe("finalise_proposals", () => {
     it("sets expired proposals to inactive", () => {
-        proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 1000, true);
+        proposals.create_add_beneficiary_proposal(0, 10, owner, user2, 1000, true);
 
         const finalisedProposals = proposals.finalise_proposals(20);
 
@@ -121,5 +121,28 @@ describe("finalise_proposals", () => {
         const activeProposals = proposals.get_active_proposals();
 
         expect(activeProposals).toHaveLength(0);
+    })
+})
+
+describe("Validate proposal", () => {
+    it("fails if member already present", () => {
+        expect(() => {
+            proposals.create_add_beneficiary_proposal(0, 10, owner, owner, 100, false);
+        }).toThrow()
+    })
+
+    it("fails if after remove invalid", () => {
+        proposals.create_remove_beneficiary_proposal(0, 10, owner, user1);
+        expect(() => {
+            proposals.create_update_beneficiary_proposal(0, 10, owner, user1, 100, false);
+        }).toThrow();
+    })
+
+    it("fails update if add would fail before", () => {
+        proposals.create_add_beneficiary_proposal(0, 10, owner, user2, 100, false);
+
+        expect(() => {
+            proposals.create_update_beneficiary_proposal(5, 20, owner, user2, 200, false);
+        }).toThrow()
     })
 })

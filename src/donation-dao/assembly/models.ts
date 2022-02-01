@@ -5,15 +5,15 @@ import { AccountId } from "../../utils";
 const BENEFICIARIES_VECTOR: string = "beneficiaries";
 const PROPOSALS_VECTOR: string = "proposals";
 
-function to_array<T>(v: PersistentVector<T>): Array<T>{
+function to_array<T>(v: PersistentVector<T>): Array<T> {
   const result = new Array<T>();
-    for (let i = 0; i < v.length; i++) {
-      result.push(v[i]);
-    }
-    return result;
+  for (let i = 0; i < v.length; i++) {
+    result.push(v[i]);
+  }
+  return result;
 }
 
-function clear<T>(v: PersistentVector<T>): void{
+function clear<T>(v: PersistentVector<T>): void {
   while (v.length > 0) {
     v.pop();
   }
@@ -54,11 +54,14 @@ export class Beneficiaries {
 
   private get_total_shares(): u64 {
     let initial: u64 = 0;
-    return to_array(this.members).reduce((sum, member) => sum + member.share, initial);
+    return this.get_members().reduce((sum, member) => sum + member.share, initial);
   }
 
   apply_proposal(proposal: Proposal): void {
-    const newMembers = proposal.apply_proposal(to_array(this.members));
+    const applyResult = proposal.apply_proposal(this.get_members());
+    assert(applyResult.success, applyResult.error);
+    const newMembers = applyResult.updatedMembers;
+
     // TODO: more intelligent/efficient merge
     clear(this.members);
     for (let i = 0; i < newMembers.length; i++) {
@@ -186,22 +189,39 @@ export class Proposals {
       }
     }
 
-    activeProposals.push(proposal);
-    if (!this._validate_active_proposals(activeProposals)) {
-      throw new Error("Cannot add proposal");
-    }
+    const validationResult = this._validate_active_proposals(activeProposals, proposal);
+    assert(validationResult.success, validationResult.error);
 
     this.proposals.push(proposal.to_serialiseable());
   }
 
-  private _validate_active_proposals(active_proposals: Array<Proposal>): boolean {
-    return true;  // TODO: add logic
+  private _validate_active_proposals(active_proposals: Array<Proposal>, new_proposal: Proposal): ProposalValidationResult {
+    const initial_members: Array<Member> = this.beneficiaries.get_members()
+
+    for (let i = 0; i < (1 << active_proposals.length); i++) {
+      let currentMembers = initial_members.map<Member>(m => m);
+      for (let j = 0; j < active_proposals.length; j++) {
+        if (i & (1 << j)) {
+          let result = active_proposals[i].apply_proposal(currentMembers);
+          if(!result.success) {
+            return new ProposalValidationResult(false, `${i}/${j}: ${result.error}`);
+          }
+          currentMembers = result.updatedMembers;
+        }
+      }
+      let result = new_proposal.apply_proposal(currentMembers);
+      if(!result.success){
+        return new ProposalValidationResult(false, `${i}/n: ${result.error}`);
+      }
+    }
+    
+    return new ProposalValidationResult(true, "");
   }
 }
 
 
 @nearBindgen
-export class SerialiseableProposal {   // https://stackoverflow.com/questions/70916471/does-persistentvector-not-support-child-classes
+export class SerialiseableProposal {   // Ugly hack for https://stackoverflow.com/questions/70916471/does-persistentvector-not-support-child-classes
   constructor(
     public proposalType: string,
     public votes: Array<AccountId>,
@@ -232,6 +252,23 @@ export class SerialiseableProposal {   // https://stackoverflow.com/questions/70
 }
 
 @nearBindgen
+export class ProposalAppliedResult {
+  constructor(
+    public success: boolean,
+    public error: string,
+    public updatedMembers: Array<Member>
+  ) { }
+}
+
+@nearBindgen
+export class ProposalValidationResult {
+  constructor(
+    public success: boolean,
+    public error: string
+  ) { }
+}
+
+@nearBindgen
 export abstract class Proposal {
   public votes: Array<AccountId>;
   public isActive: boolean;
@@ -244,17 +281,26 @@ export abstract class Proposal {
     this.isActive = true;
   }
 
-  abstract apply_proposal(members: Array<Member>): Array<Member>;
+  abstract apply_proposal(members: Array<Member>): ProposalAppliedResult;
 
   abstract to_serialiseable(): SerialiseableProposal;
 
   abstract describe(): string;
 
-  protected verify_members_integiry(members: Array<Member>): void {
-    assert(members.length > 0, "There always must be members");
-    assert(members.reduce((c, member) => c + (member.isAuthoriser ? 1 : 0), 0) > 0, "There always must be at least one authoriser")
+  protected verify_members_integiry(members: Array<Member>): ProposalAppliedResult {
+    if (members.length <= 0) {
+      return new ProposalAppliedResult(false, "No members present", members);
+    }
+    if (members.filter(member => member.isAuthoriser).length <= 0) {
+      return new ProposalAppliedResult(false, "No Authorisers present", members);
+    }
+
     let initialShares: u64 = 0;
-    assert(members.reduce((s, member) => s + member.share, initialShares) > 0, "Total shares must be greater than 0");
+    if (members.reduce((s, member) => s + member.share, initialShares) <= 0) {
+      return new ProposalAppliedResult(false, "Total shares are 0", members);
+    }
+
+    return new ProposalAppliedResult(true, "", members);
   }
 
   did_pass(members: Array<Member>): boolean {
@@ -288,18 +334,18 @@ export class AddBeneficiaryProposal extends Proposal {
     super(proposalId, deadline, createdBy);
   }
 
-  apply_proposal(members: Array<Member>): Array<Member> {
+  apply_proposal(members: Array<Member>): ProposalAppliedResult {
     const result: Array<Member> = [];
     for (let i = 0; i < members.length; i++) {
-      assert(members[i].account != this.account, "Added member must not already be a member")
+      if (members[i].account == this.account) {
+        return new ProposalAppliedResult(false, "Member already present", members);
+      }
       result.push(members[i])
     }
 
     result.push(new Member(this.account, this.share, this.isAuthoriser));
 
-    this.verify_members_integiry(result);
-
-    return result;
+    return this.verify_members_integiry(result)
   }
 
   to_serialiseable(): SerialiseableProposal {
@@ -332,18 +378,18 @@ export class RemoveBeneficiaryProposal extends Proposal {
     super(proposalId, deadline, createdBy);
   }
 
-  apply_proposal(members: Array<Member>): Array<Member> {
+  apply_proposal(members: Array<Member>): ProposalAppliedResult {
     const result: Array<Member> = [];
     for (let i = 0; i < members.length; i++) {
       if (members[i].account != this.account) {
         result.push(members[i]);
       }
     }
-    assert(result.length != members.length, "Removed member must be a member")
+    if (result.length == members.length) {
+      return new ProposalAppliedResult(false, "Removed member is not a member", members);
+    }
 
-    this.verify_members_integiry(result);
-
-    return result;
+    return this.verify_members_integiry(result);
   }
 
   to_serialiseable(): SerialiseableProposal {
@@ -378,7 +424,7 @@ export class UpdateBeneficiaryProposal extends Proposal {
     super(proposalId, deadline, createdBy)
   }
 
-  apply_proposal(members: Array<Member>): Array<Member> {
+  apply_proposal(members: Array<Member>): ProposalAppliedResult {
     const result: Array<Member> = [];
     let updated = false;
     for (let i = 0; i < members.length; i++) {
@@ -393,11 +439,11 @@ export class UpdateBeneficiaryProposal extends Proposal {
         ))
       }
     }
-    assert(updated, "Updated member must be a member")
+    if (!updated) {
+      return new ProposalAppliedResult(false, "Updated member is not a member", members);
+    }
 
-    this.verify_members_integiry(result);
-
-    return result;
+    return this.verify_members_integiry(result);
   }
 
   to_serialiseable(): SerialiseableProposal {
@@ -420,11 +466,11 @@ export class UpdateBeneficiaryProposal extends Proposal {
 }
 
 @nearBindgen
-export class ProposalResult{
+export class ProposalResult {
   constructor(
     public proposal: Proposal,
     public passed: boolean
-  ){}
+  ) { }
 
   describe(): string {
     return `Proposal #${this.proposal.proposalId}: ${this.passed ? "PASSED" : "FAILED"}`
