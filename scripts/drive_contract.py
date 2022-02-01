@@ -5,9 +5,13 @@ import re
 import json
 from contextlib import contextmanager
 import time
+import argparse
 
-OWNER = "tituszban.testnet"
-USER1 = "dev1.tituszban.testnet"
+
+parser = argparse.ArgumentParser(description="Contract driver for donation-dao testing")
+parser.add_argument("owner", type=str, help="Name of the account that owns the contract; e.g.: tituszban.testnet")
+parser.add_argument("user", type=str, help="Name of the account that is added to the contract; e.g.: dev1.tituszban.testnet")
+
 
 def call(arguments):
     result = subprocess.run(arguments, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -20,6 +24,7 @@ def call(arguments):
         raise Exception()
     return stdout
 
+
 def build():
     if os.path.isdir("./neardev"):
         shutil.rmtree("./neardev")
@@ -27,14 +32,17 @@ def build():
     print("===== Building release version =====")
     call(["yarn", "build:release"])
 
+
 def init_contract():
     print("===== Deploying contract to testnet =====")
     result = call(["near", "dev-deploy", "./build/release/donation-dao.wasm"])
     return re.findall(r"Account id: (dev-\d+-\d+),", result.split("\n")[0])[0]
 
+
 def delete_contract(contract_id, beneficiary):
     print("===== Deleting contract =====")
     call(["near", "delete", contract_id, beneficiary])
+
 
 @contextmanager
 def smart_contract(owner):
@@ -88,7 +96,8 @@ def create_contract(owner, user):
 
 
 def main():
-    create_contract(OWNER, USER1)
+    args = parser.parse_args()
+    create_contract(args.owner, args.user)
 
 if __name__ == "__main__":
     main()
